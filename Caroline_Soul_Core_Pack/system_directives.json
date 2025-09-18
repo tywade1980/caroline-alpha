@@ -1,0 +1,8 @@
+{
+  "deployment_mode": "full_send",
+  "rollback": false,
+  "auto_evolve": true,
+  "network_awareness": true,
+  "operator": "Tyler Wade",
+  "governance": "Single-user command protocol"
+}
