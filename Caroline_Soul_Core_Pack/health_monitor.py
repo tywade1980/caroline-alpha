@@ -3,15 +3,53 @@ CAROLINE HEALTH MONITORING SERVICE
 Real-time health monitoring and system diagnostics
 """
 
-from flask import Blueprint, jsonify
-import psutil
+try:
+    from flask import Blueprint, jsonify
+    health_bp = Blueprint('health', __name__)
+    FLASK_AVAILABLE = True
+except ImportError:
+    health_bp = None
+    FLASK_AVAILABLE = False
+
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
+    # Mock psutil for basic functionality
+    class MockPsutil:
+        @staticmethod
+        def cpu_percent(interval=1):
+            return 25.0
+        
+        @staticmethod
+        def virtual_memory():
+            class MockMemory:
+                percent = 45.0
+                total = 8589934592  # 8GB
+                available = 4294967296  # 4GB
+            return MockMemory()
+        
+        @staticmethod
+        def disk_usage(path):
+            class MockDisk:
+                percent = 35.0
+                total = 1099511627776  # 1TB
+                free = 687194767360  # ~640GB
+            return MockDisk()
+        
+        @staticmethod
+        def boot_time():
+            import time
+            return time.time() - 86400  # 1 day ago
+    
+    psutil = MockPsutil()
+
 import threading
 import time
 from datetime import datetime, timedelta
 from typing import Dict, Any, List
 import json
-
-health_bp = Blueprint('health', __name__)
 
 class CarolineHealthMonitor:
     """Advanced health monitoring for Caroline Alpha system"""

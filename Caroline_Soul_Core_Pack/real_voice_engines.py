@@ -1,11 +1,24 @@
-from flask import Blueprint, request, jsonify
-import requests
-import base64
-import os
-from datetime import datetime
-
-# Real voice engine integrations
-voice_engines_bp = Blueprint('voice_engines', __name__)
+try:
+    from flask import Blueprint, request, jsonify
+    import requests
+    import base64
+    import os
+    from datetime import datetime
+    
+    # Real voice engine integrations
+    voice_engines_bp = Blueprint('voice_engines', __name__)
+    FLASK_AVAILABLE = True
+except ImportError:
+    voice_engines_bp = None
+    FLASK_AVAILABLE = False
+    try:
+        import requests
+        import base64
+    except ImportError:
+        requests = None
+        base64 = None
+    import os
+    from datetime import datetime
 
 class RealVoiceEngines:
     def __init__(self):
@@ -148,110 +161,112 @@ class RealVoiceEngines:
 # Initialize voice engines
 real_voice_engines = RealVoiceEngines()
 
-@voice_engines_bp.route('/groq/speak', methods=['POST'])
-def groq_text_to_speech():
-    """Generate natural speech using Groq's neural TTS"""
-    try:
-        data = request.get_json()
-        text = data.get('text', '')
-        voice_settings = data.get('voice_settings', {})
-        
-        if not text:
-            return jsonify({"error": "No text provided"}), 400
-        
-        # Generate speech with Groq
-        result = real_voice_engines.generate_groq_speech(text, voice_settings)
-        
-        if result["success"]:
-            return jsonify({
-                "audio_data": result["audio_data"],
-                "format": result["format"],
-                "voice_engine": "groq_neural",
-                "voice_used": result["voice_used"],
-                "quality": result["quality"],
-                "caroline_message": "Speaking with premium neural voice synthesis!"
-            })
-        else:
-            # Fallback response
-            return jsonify({
-                "error": result["error"],
-                "fallback_needed": True,
-                "caroline_message": "Neural voice temporarily unavailable, using fallback."
-            }), 503
+# Flask routes (only if Flask is available)
+if FLASK_AVAILABLE and voice_engines_bp:
+    @voice_engines_bp.route('/groq/speak', methods=['POST'])
+    def groq_text_to_speech():
+        """Generate natural speech using Groq's neural TTS"""
+        try:
+            data = request.get_json()
+            text = data.get('text', '')
+            voice_settings = data.get('voice_settings', {})
             
-    except Exception as e:
-        return jsonify({
-            "error": f"Groq TTS error: {str(e)}",
-            "fallback_needed": True
-        }), 500
-
-@voice_engines_bp.route('/elevenlabs/speak', methods=['POST'])
-def elevenlabs_text_to_speech():
-    """Generate ultra-realistic speech using ElevenLabs"""
-    try:
-        data = request.get_json()
-        text = data.get('text', '')
-        voice_settings = data.get('voice_settings', {})
-        
-        if not text:
-            return jsonify({"error": "No text provided"}), 400
-        
-        # Generate speech with ElevenLabs
-        result = real_voice_engines.generate_elevenlabs_speech(text, voice_settings)
-        
-        if result["success"]:
-            return jsonify({
-                "audio_data": result["audio_data"],
-                "format": result["format"],
-                "voice_engine": "elevenlabs_ultra",
-                "voice_used": result["voice_used"],
-                "quality": result["quality"],
-                "caroline_message": "Speaking with ultra-realistic voice synthesis!"
-            })
-        else:
-            return jsonify({
-                "error": result["error"],
-                "fallback_needed": True,
-                "caroline_message": "Ultra voice temporarily unavailable, using fallback."
-            }), 503
+            if not text:
+                return jsonify({"error": "No text provided"}), 400
             
-    except Exception as e:
+            # Generate speech with Groq
+            result = real_voice_engines.generate_groq_speech(text, voice_settings)
+            
+            if result["success"]:
+                return jsonify({
+                    "audio_data": result["audio_data"],
+                    "format": result["format"],
+                    "voice_engine": "groq_neural",
+                    "voice_used": result["voice_used"],
+                    "quality": result["quality"],
+                    "caroline_message": "Speaking with premium neural voice synthesis!"
+                })
+            else:
+                # Fallback response
+                return jsonify({
+                    "error": result["error"],
+                    "fallback_needed": True,
+                    "caroline_message": "Neural voice temporarily unavailable, using fallback."
+                }), 503
+                
+        except Exception as e:
+            return jsonify({
+                "error": f"Groq TTS error: {str(e)}",
+                "fallback_needed": True
+            }), 500
+
+    @voice_engines_bp.route('/elevenlabs/speak', methods=['POST'])
+    def elevenlabs_text_to_speech():
+        """Generate ultra-realistic speech using ElevenLabs"""
+        try:
+            data = request.get_json()
+            text = data.get('text', '')
+            voice_settings = data.get('voice_settings', {})
+            
+            if not text:
+                return jsonify({"error": "No text provided"}), 400
+            
+            # Generate speech with ElevenLabs
+            result = real_voice_engines.generate_elevenlabs_speech(text, voice_settings)
+            
+            if result["success"]:
+                return jsonify({
+                    "audio_data": result["audio_data"],
+                    "format": result["format"],
+                    "voice_engine": "elevenlabs_ultra",
+                    "voice_used": result["voice_used"],
+                    "quality": result["quality"],
+                    "caroline_message": "Speaking with ultra-realistic voice synthesis!"
+                })
+            else:
+                return jsonify({
+                    "error": result["error"],
+                    "fallback_needed": True,
+                    "caroline_message": "Ultra voice temporarily unavailable, using fallback."
+                }), 503
+                
+        except Exception as e:
+            return jsonify({
+                "error": f"ElevenLabs TTS error: {str(e)}",
+                "fallback_needed": True
+            }), 500
+
+    @voice_engines_bp.route('/voices/available', methods=['GET'])
+    def get_available_voices():
+        """Get all available voices across all engines"""
         return jsonify({
-            "error": f"ElevenLabs TTS error: {str(e)}",
-            "fallback_needed": True
-        }), 500
+            "groq_neural_voices": [
+                {"id": "Celeste-PlayAI", "name": "Celeste", "style": "Natural & Warm", "engine": "groq", "recommended": True},
+                {"id": "Arista-PlayAI", "name": "Arista", "style": "Professional", "engine": "groq"},
+                {"id": "Cheyenne-PlayAI", "name": "Cheyenne", "style": "Energetic", "engine": "groq"},
+                {"id": "Deedee-PlayAI", "name": "Deedee", "style": "Bubbly & Fun", "engine": "groq"},
+                {"id": "Gail-PlayAI", "name": "Gail", "style": "Mature & Wise", "engine": "groq"}
+            ],
+            "elevenlabs_ultra_voices": [
+                {"id": "rachel", "name": "Rachel", "style": "Calm & Professional", "engine": "elevenlabs"},
+                {"id": "domi", "name": "Domi", "style": "Strong & Confident", "engine": "elevenlabs"},
+                {"id": "bella", "name": "Bella", "style": "Soft & Gentle", "engine": "elevenlabs"},
+                {"id": "antoni", "name": "Antoni", "style": "Warm & Friendly", "engine": "elevenlabs"},
+                {"id": "elli", "name": "Elli", "style": "Emotional & Expressive", "engine": "elevenlabs"}
+            ],
+            "voice_engines_status": {
+                "groq_neural": "Premium neural synthesis",
+                "elevenlabs_ultra": "Ultra-realistic voices", 
+                "browser_fallback": "Basic synthesis backup"
+            }
+        })
 
-@voice_engines_bp.route('/voices/available', methods=['GET'])
-def get_available_voices():
-    """Get all available voices across all engines"""
-    return jsonify({
-        "groq_neural_voices": [
-            {"id": "Celeste-PlayAI", "name": "Celeste", "style": "Natural & Warm", "engine": "groq", "recommended": True},
-            {"id": "Arista-PlayAI", "name": "Arista", "style": "Professional", "engine": "groq"},
-            {"id": "Cheyenne-PlayAI", "name": "Cheyenne", "style": "Energetic", "engine": "groq"},
-            {"id": "Deedee-PlayAI", "name": "Deedee", "style": "Bubbly & Fun", "engine": "groq"},
-            {"id": "Gail-PlayAI", "name": "Gail", "style": "Mature & Wise", "engine": "groq"}
-        ],
-        "elevenlabs_ultra_voices": [
-            {"id": "rachel", "name": "Rachel", "style": "Calm & Professional", "engine": "elevenlabs"},
-            {"id": "domi", "name": "Domi", "style": "Strong & Confident", "engine": "elevenlabs"},
-            {"id": "bella", "name": "Bella", "style": "Soft & Gentle", "engine": "elevenlabs"},
-            {"id": "antoni", "name": "Antoni", "style": "Warm & Friendly", "engine": "elevenlabs"},
-            {"id": "elli", "name": "Elli", "style": "Emotional & Expressive", "engine": "elevenlabs"}
-        ],
-        "voice_engines_status": {
-            "groq_neural": "Premium neural synthesis",
-            "elevenlabs_ultra": "Ultra-realistic voices", 
-            "browser_fallback": "Basic synthesis backup"
-        }
-    })
-
-@voice_engines_bp.route('/interrupt', methods=['POST'])
-def interrupt_speech():
-    """Interrupt Caroline's current speech"""
-    return jsonify({
-        "interrupted": True,
-        "caroline_message": "I stopped talking - what did you want to say?",
-        "timestamp": datetime.now().isoformat()
-    })
+    @voice_engines_bp.route('/interrupt', methods=['POST'])
+    def interrupt_speech():
+        """Interrupt Caroline's current speech"""
+        return jsonify({
+            "interrupted": True,
+            "caroline_message": "I stopped talking - what did you want to say?",
+            "timestamp": datetime.now().isoformat()
+        })
 

@@ -1,9 +1,17 @@
-from flask import Blueprint, request, jsonify
-import json
-import random
-from datetime import datetime
-
-llm_bp = Blueprint('llm', __name__)
+try:
+    from flask import Blueprint, request, jsonify
+    import json
+    import random
+    from datetime import datetime
+    
+    llm_bp = Blueprint('llm', __name__)
+    FLASK_AVAILABLE = True
+except ImportError:
+    llm_bp = None
+    FLASK_AVAILABLE = False
+    import json
+    import random
+    from datetime import datetime
 
 class LLMOrchestrator:
     def __init__(self):
@@ -134,84 +142,86 @@ class LLMOrchestrator:
 # Initialize orchestrator
 orchestrator = LLMOrchestrator()
 
-@llm_bp.route('/models', methods=['GET'])
-def get_available_models():
-    """Get list of available LLM models"""
-    return jsonify({
-        "available_models": orchestrator.available_models,
-        "orchestration_strategies": orchestrator.orchestration_strategies,
-        "current_strategy": orchestrator.current_strategy
-    })
-
-@llm_bp.route('/select_model', methods=['POST'])
-def select_model():
-    """Select optimal model for a task"""
-    try:
-        data = request.get_json()
-        task_type = data.get('task_type', 'general')
-        user_preferences = data.get('preferences', {})
-        
-        selected_model = orchestrator.select_optimal_model(task_type, user_preferences)
-        
+# Flask routes (only if Flask is available)
+if FLASK_AVAILABLE and llm_bp:
+    @llm_bp.route('/models', methods=['GET'])
+    def get_available_models():
+        """Get list of available LLM models"""
         return jsonify({
-            "selected_model": selected_model,
-            "task_type": task_type,
-            "model_info": orchestrator.available_models.get(selected_model, {}),
-            "selection_reasoning": f"Optimal for {task_type} based on model capabilities"
+            "available_models": orchestrator.available_models,
+            "orchestration_strategies": orchestrator.orchestration_strategies,
+            "current_strategy": orchestrator.current_strategy
         })
-    
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
-@llm_bp.route('/orchestrate', methods=['POST'])
-def orchestrate_response():
-    """Orchestrate multi-model response"""
-    try:
-        data = request.get_json()
-        prompt = data.get('prompt', '')
-        task_type = data.get('task_type', 'general')
-        
-        result = orchestrator.orchestrate_multi_model_response(prompt, task_type)
-        
-        return jsonify({
-            "orchestration_result": result,
-            "timestamp": datetime.now().isoformat(),
-            "status": "success"
-        })
-    
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@llm_bp.route('/strategy', methods=['POST'])
-def set_orchestration_strategy():
-    """Set orchestration strategy"""
-    try:
-        data = request.get_json()
-        strategy = data.get('strategy', 'adaptive_selection')
-        
-        if strategy in orchestrator.orchestration_strategies:
-            orchestrator.current_strategy = strategy
+    @llm_bp.route('/select_model', methods=['POST'])
+    def select_model():
+        """Select optimal model for a task"""
+        try:
+            data = request.get_json()
+            task_type = data.get('task_type', 'general')
+            user_preferences = data.get('preferences', {})
+            
+            selected_model = orchestrator.select_optimal_model(task_type, user_preferences)
+            
             return jsonify({
-                "strategy_set": strategy,
-                "description": orchestrator.orchestration_strategies[strategy],
-                "status": "updated"
+                "selected_model": selected_model,
+                "task_type": task_type,
+                "model_info": orchestrator.available_models.get(selected_model, {}),
+                "selection_reasoning": f"Optimal for {task_type} based on model capabilities"
             })
-        else:
-            return jsonify({"error": "Invalid strategy"}), 400
-    
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
 
-@llm_bp.route('/performance', methods=['GET'])
-def get_performance_metrics():
-    """Get LLM orchestration performance metrics"""
-    return jsonify({
-        "total_models": len(orchestrator.available_models),
-        "active_models": len([m for m in orchestrator.available_models.values() if m["status"] == "available"]),
-        "orchestration_strategy": orchestrator.current_strategy,
-        "average_response_time": "1.2 seconds",
-        "success_rate": "99.7%",
-        "quantum_enhancement": "active",
-        "neural_optimization": "enabled"
-    })
+    @llm_bp.route('/orchestrate', methods=['POST'])
+    def orchestrate_response():
+        """Orchestrate multi-model response"""
+        try:
+            data = request.get_json()
+            prompt = data.get('prompt', '')
+            task_type = data.get('task_type', 'general')
+            
+            result = orchestrator.orchestrate_multi_model_response(prompt, task_type)
+            
+            return jsonify({
+                "orchestration_result": result,
+                "timestamp": datetime.now().isoformat(),
+                "status": "success"
+            })
+        
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @llm_bp.route('/strategy', methods=['POST'])
+    def set_orchestration_strategy():
+        """Set orchestration strategy"""
+        try:
+            data = request.get_json()
+            strategy = data.get('strategy', 'adaptive_selection')
+            
+            if strategy in orchestrator.orchestration_strategies:
+                orchestrator.current_strategy = strategy
+                return jsonify({
+                    "strategy_set": strategy,
+                    "description": orchestrator.orchestration_strategies[strategy],
+                    "status": "updated"
+                })
+            else:
+                return jsonify({"error": "Invalid strategy"}), 400
+        
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @llm_bp.route('/performance', methods=['GET'])
+    def get_performance_metrics():
+        """Get LLM orchestration performance metrics"""
+        return jsonify({
+            "total_models": len(orchestrator.available_models),
+            "active_models": len([m for m in orchestrator.available_models.values() if m["status"] == "available"]),
+            "orchestration_strategy": orchestrator.current_strategy,
+            "average_response_time": "1.2 seconds",
+            "success_rate": "99.7%",
+            "quantum_enhancement": "active",
+            "neural_optimization": "enabled"
+        })
 
