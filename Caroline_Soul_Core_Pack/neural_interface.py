@@ -1,11 +1,23 @@
-from flask import Blueprint, request, jsonify
-from datetime import datetime, timedelta
-import threading
-import time
-import queue
-import json
-
-neural_bp = Blueprint('neural', __name__)
+try:
+    from flask import Blueprint, request, jsonify
+    from datetime import datetime, timedelta
+    import threading
+    import time
+    import queue
+    import json
+    
+    # Create blueprint only if Flask is available
+    neural_bp = Blueprint('neural', __name__)
+    FLASK_AVAILABLE = True
+except ImportError:
+    # Flask not available, create mock blueprint
+    neural_bp = None
+    FLASK_AVAILABLE = False
+    from datetime import datetime, timedelta
+    import threading
+    import time
+    import queue
+    import json
 
 class CarolineOS:
     def __init__(self):
@@ -279,83 +291,85 @@ class ContextManager:
 # Initialize Caroline OS
 caroline_os = CarolineOS()
 
-@neural_bp.route('/os_status', methods=['GET'])
-def get_os_status():
-    """Get Caroline OS system status"""
-    return jsonify({
-        "system_status": caroline_os.system_status,
-        "background_services": {
-            name: {
-                "status": service["status"],
-                "last_activity": service["last_activity"].isoformat()
+# Flask routes (only if Flask is available)
+if FLASK_AVAILABLE and neural_bp:
+    @neural_bp.route('/os_status', methods=['GET'])
+    def get_os_status():
+        """Get Caroline OS system status"""
+        return jsonify({
+            "system_status": caroline_os.system_status,
+            "background_services": {
+                name: {
+                    "status": service["status"],
+                    "last_activity": service["last_activity"].isoformat()
+                }
+                for name, service in caroline_os.background_services.items()
+            },
+            "decision_engine": {
+                "pending_decisions": caroline_os.decision_engine.pending_decisions.qsize(),
+                "decisions_made": len(caroline_os.decision_engine.decision_history)
+            },
+            "data_queues": {
+                name: queue_obj.qsize()
+                for name, queue_obj in caroline_os.data_queues.items()
             }
-            for name, service in caroline_os.background_services.items()
-        },
-        "decision_engine": {
-            "pending_decisions": caroline_os.decision_engine.pending_decisions.qsize(),
-            "decisions_made": len(caroline_os.decision_engine.decision_history)
-        },
-        "data_queues": {
-            name: queue_obj.qsize()
-            for name, queue_obj in caroline_os.data_queues.items()
-        }
-    })
+        })
 
-@neural_bp.route('/recent_decisions', methods=['GET'])
-def get_recent_decisions():
-    """Get recent autonomous decisions made by Caroline OS"""
-    recent_decisions = caroline_os.decision_engine.decision_history[-10:]  # Last 10 decisions
-    return jsonify({
-        "recent_decisions": [
-            {
-                "type": decision["type"],
-                "trigger": decision["trigger"],
-                "executed_at": decision["executed_at"].isoformat(),
-                "status": decision["status"],
-                "urgency": decision["urgency"]
+    @neural_bp.route('/recent_decisions', methods=['GET'])
+    def get_recent_decisions():
+        """Get recent autonomous decisions made by Caroline OS"""
+        recent_decisions = caroline_os.decision_engine.decision_history[-10:]  # Last 10 decisions
+        return jsonify({
+            "recent_decisions": [
+                {
+                    "type": decision["type"],
+                    "trigger": decision["trigger"],
+                    "executed_at": decision["executed_at"].isoformat(),
+                    "status": decision["status"],
+                    "urgency": decision["urgency"]
+                }
+                for decision in recent_decisions
+            ],
+            "total_decisions": len(caroline_os.decision_engine.decision_history)
+        })
+
+    @neural_bp.route('/queue_status', methods=['GET'])
+    def get_queue_status():
+        """Get real-time data queue status"""
+        queue_status = {}
+        for name, queue_obj in caroline_os.data_queues.items():
+            queue_status[name] = {
+                "size": queue_obj.qsize(),
+                "status": "active" if queue_obj.qsize() > 0 else "idle"
             }
-            for decision in recent_decisions
-        ],
-        "total_decisions": len(caroline_os.decision_engine.decision_history)
-    })
+        
+        return jsonify({
+            "queues": queue_status,
+            "system_load": "optimal",
+            "processing_rate": "real_time"
+        })
 
-@neural_bp.route('/queue_status', methods=['GET'])
-def get_queue_status():
-    """Get real-time data queue status"""
-    queue_status = {}
-    for name, queue_obj in caroline_os.data_queues.items():
-        queue_status[name] = {
-            "size": queue_obj.qsize(),
-            "status": "active" if queue_obj.qsize() > 0 else "idle"
+    @neural_bp.route('/force_decision', methods=['POST'])
+    def force_decision():
+        """Force Caroline OS to make a specific decision"""
+        data = request.get_json()
+        decision_type = data.get('type')
+        decision_data = data.get('data', {})
+        
+        forced_decision = {
+            "type": decision_type,
+            "trigger": "user_request",
+            "data": decision_data,
+            "urgency": "immediate",
+            "auto_execute": True,
+            "forced": True
         }
-    
-    return jsonify({
-        "queues": queue_status,
-        "system_load": "optimal",
-        "processing_rate": "real_time"
-    })
-
-@neural_bp.route('/force_decision', methods=['POST'])
-def force_decision():
-    """Force Caroline OS to make a specific decision"""
-    data = request.get_json()
-    decision_type = data.get('type')
-    decision_data = data.get('data', {})
-    
-    forced_decision = {
-        "type": decision_type,
-        "trigger": "user_request",
-        "data": decision_data,
-        "urgency": "immediate",
-        "auto_execute": True,
-        "forced": True
-    }
-    
-    caroline_os.decision_engine.pending_decisions.put(forced_decision)
-    
-    return jsonify({
-        "decision_queued": True,
-        "decision_type": decision_type,
-        "status": "will_execute_immediately"
-    })
+        
+        caroline_os.decision_engine.pending_decisions.put(forced_decision)
+        
+        return jsonify({
+            "decision_queued": True,
+            "decision_type": decision_type,
+            "status": "will_execute_immediately"
+        })
 
