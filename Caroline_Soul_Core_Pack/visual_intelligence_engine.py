@@ -4,7 +4,18 @@ Integrating Veo 3 and Advanced Visual AI Capabilities
 """
 
 import asyncio
-import numpy as np
+try:
+    import numpy as np
+    NUMPY_AVAILABLE = True
+except ImportError:
+    NUMPY_AVAILABLE = False
+    # Create a simple mock numpy for basic operations
+    class MockNumPy:
+        @staticmethod
+        def array(*args, **kwargs):
+            return list(*args) if args else []
+    np = MockNumPy()
+
 from datetime import datetime
 import json
 import threading
